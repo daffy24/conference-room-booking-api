@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ConferenceBooking.Core.Application</AssemblyName>
+    <RootNamespace>ConferenceBooking.Core.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Data\Data\Data.csproj" />
+  </ItemGroup>
+</Project>

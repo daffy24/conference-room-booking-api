@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/TestResults/
+**/.idea/
+**/.vs/
+.git/
+.env
+.env.*
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/secrets.json
+**/*.user
+**/*.suo
+**/*.log
+**/*.pfx
+**/*.key

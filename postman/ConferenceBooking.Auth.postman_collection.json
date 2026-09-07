@@ -1,0 +1,145 @@
+{
+  "info": {
+    "_postman_id": "392e125b-2d7b-4d54-b310-5df26e85d965",
+    "name": "Conference Booking · Authentication",
+    "description": "Локальна перевірка входу через Keycloak. Імпортуйте середовище Conference Booking · Local. У вкладці Authorization цієї колекції натисніть Get New Access Token, увійдіть через браузер і натисніть Use Token. Потім виконайте запити або запустіть колекцію. Користувачі: booking-customer (DEMO_CUSTOMER_PASSWORD у .env) і booking-admin (DEMO_ADMIN_PASSWORD). Пароль вводиться на сторінці Keycloak. Для зміни користувача отримайте новий токен. Деталі: postman/README.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      { "key": "tokenName", "value": "Conference Booking · Local", "type": "string" },
+      { "key": "grant_type", "value": "authorization_code_with_pkce", "type": "string" },
+      { "key": "challengeAlgorithm", "value": "S256", "type": "string" },
+      { "key": "useBrowser", "value": true, "type": "boolean" },
+      { "key": "authUrl", "value": "{{authority}}/protocol/openid-connect/auth?prompt=login", "type": "string" },
+      { "key": "accessTokenUrl", "value": "{{authority}}/protocol/openid-connect/token", "type": "string" },
+      { "key": "refreshTokenUrl", "value": "{{authority}}/protocol/openid-connect/token", "type": "string" },
+      { "key": "clientId", "value": "{{client_id}}", "type": "string" },
+      { "key": "redirect_uri", "value": "{{callback_url}}", "type": "string" },
+      { "key": "scope", "value": "openid", "type": "string" },
+      { "key": "state", "value": "{{$guid}}", "type": "string" },
+      { "key": "client_authentication", "value": "body", "type": "string" },
+      { "key": "addTokenTo", "value": "header", "type": "string" },
+      { "key": "headerPrefix", "value": "Bearer", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "01 · Health",
+      "description": "Публічні перевірки доступності сервісів.",
+      "item": [
+        {
+          "name": "API is alive · 200",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": "{{base_url}}/health/live",
+            "description": "Перевіряє, що процес API відповідає. Не залежить від доступності бази."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('API is alive', () => pm.response.to.have.status(200));",
+            "pm.test('Health response is Healthy', () => pm.expect(pm.response.text()).to.eql('Healthy'));"
+          ] } }]
+        },
+        {
+          "name": "Database is ready · 200",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": "{{base_url}}/health/ready",
+            "description": "Перевіряє підключення API до PostgreSQL. При недоступній БД очікується 503."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Database is ready', () => pm.response.to.have.status(200));",
+            "pm.test('Health response is Healthy', () => pm.expect(pm.response.text()).to.eql('Healthy'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "02 · Identity",
+      "description": "Використовує токен із Authorization колекції. Вхід виконайте через Get New Access Token → Use Token.",
+      "item": [
+        {
+          "name": "Current user · 200",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/identity/me",
+            "description": "Повертає id, username та roles з перевіреного токена. Для booking-customer очікується Customer, для booking-admin — Admin. Успішний виклик перевіряє автентифікацію та claims; політики доступу до бізнес-методів перевірятимемо після їх появи."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Authenticated request succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Identity contains a subject and username', () => {",
+            "  const user = pm.response.json();",
+            "  pm.expect(user.id).to.be.a('string').and.not.empty;",
+            "  pm.expect(user.username).to.be.a('string').and.not.empty;",
+            "  pm.expect(user.roles).to.be.an('array');",
+            "});",
+            "pm.test('Demo user has the assigned application role', () => {",
+            "  const user = pm.response.json();",
+            "  const expectedRoles = { 'booking-customer': 'Customer', 'booking-admin': 'Admin' };",
+            "  pm.expect(user.username).to.be.oneOf(Object.keys(expectedRoles));",
+            "  pm.expect(user.roles).to.include(expectedRoles[user.username]);",
+            "});"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "03 · Rejected requests",
+      "description": "Негативні перевірки. Запити явно перевизначають автентифікацію колекції.",
+      "item": [
+        {
+          "name": "No token · 401",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": "{{base_url}}/api/identity/me",
+            "description": "Authorization header не надсилається, навіть коли в колекції вибраний токен."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Missing token is rejected', () => pm.response.to.have.status(401));",
+            "pm.test('API sends a Bearer challenge', () => pm.expect(pm.response.headers.get('WWW-Authenticate')).to.match(/^Bearer/i));"
+          ] } }]
+        },
+        {
+          "name": "Invalid token · 401",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "invalid-token", "type": "string" }] },
+            "url": "{{base_url}}/api/identity/me",
+            "description": "Надсилає завідомо некоректний bearer token. Справжній токен колекції зберігається."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Invalid token is rejected', () => pm.response.to.have.status(401));",
+            "pm.test('API sends a Bearer challenge', () => pm.expect(pm.response.headers.get('WWW-Authenticate')).to.match(/^Bearer/i));",
+            "pm.test('Validation details are not exposed', () => {",
+            "  pm.expect(pm.response.text()).not.to.include('IDX');",
+            "  pm.expect(pm.response.headers.get('WWW-Authenticate')).not.to.include('error_description');",
+            "});"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "04 · Keycloak",
+      "item": [
+        {
+          "name": "OpenID Connect discovery · 200",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": "{{authority}}/.well-known/openid-configuration",
+            "description": "Публічні адреси Keycloak, issuer та підтримувані способи входу."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Discovery is available', () => pm.response.to.have.status(200));",
+            "pm.test('Issuer matches the environment', () => pm.expect(pm.response.json().issuer).to.eql(pm.environment.get('authority')));",
+            "pm.test('PKCE with S256 is supported', () => pm.expect(pm.response.json().code_challenge_methods_supported).to.include('S256'));"
+          ] } }]
+        }
+      ]
+    }
+  ]
+}

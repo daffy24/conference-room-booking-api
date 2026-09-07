@@ -1,0 +1,132 @@
+{
+  "realm": "conference-booking",
+  "enabled": true,
+  "displayName": "Conference Booking",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "roles": {
+    "realm": [
+      { "name": "Admin", "description": "Manage rooms and view business reports" },
+      { "name": "Customer", "description": "Book rooms and access own bookings" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "conference-booking-api",
+      "name": "Conference Booking API",
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "conference-booking-swagger",
+      "name": "Swagger (local development)",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5080/swagger/oauth2-redirect.html",
+        "https://localhost:7080/swagger/oauth2-redirect.html"
+      ],
+      "webOrigins": ["http://localhost:5080", "https://localhost:7080"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "conference-booking-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "api-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "conference-booking-postman",
+      "name": "Postman (local development)",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "https://oauth.pstmn.io/v1/browser-callback",
+        "https://oauth.pstmn.io/v1/callback"
+      ],
+      "webOrigins": [],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "conference-booking-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "api-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "booking-admin",
+      "enabled": true,
+      "firstName": "Booking",
+      "lastName": "Administrator",
+      "email": "admin@example.test",
+      "emailVerified": true,
+      "realmRoles": ["Admin"],
+      "credentials": [{ "type": "password", "value": "${DEMO_ADMIN_PASSWORD}", "temporary": false }]
+    },
+    {
+      "username": "booking-customer",
+      "enabled": true,
+      "firstName": "Booking",
+      "lastName": "Customer",
+      "email": "customer@example.test",
+      "emailVerified": true,
+      "realmRoles": ["Customer"],
+      "credentials": [{ "type": "password", "value": "${DEMO_CUSTOMER_PASSWORD}", "temporary": false }]
+    }
+  ]
+}

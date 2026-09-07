@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ConferenceBooking.Data</AssemblyName>
+    <RootNamespace>ConferenceBooking.Data</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\Common\Common.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+  </ItemGroup>
+</Project>
