@@ -30,6 +30,8 @@ internal sealed class BookingEntityConfiguration : IEntityTypeConfiguration<Book
 
         entity.HasIndex(x => new { x.RoomId, x.StartsAt })
             .HasDatabaseName("ix_bookings_room_id_starts_at");
+        // Cross-room reports filter by time without a leading room identifier.
+        entity.HasIndex(x => x.StartsAt).HasDatabaseName("ix_bookings_starts_at");
         entity.HasIndex(x => new { x.UserId, x.CreatedAt })
             .HasDatabaseName("ix_bookings_user_id_created_at");
 

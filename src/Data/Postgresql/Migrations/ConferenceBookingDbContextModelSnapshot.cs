@@ -80,6 +80,9 @@ namespace ConferenceBooking.Data.Postgresql.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("StartsAt")
+                        .HasDatabaseName("ix_bookings_starts_at");
+
                     b.HasIndex("RoomId", "StartsAt")
                         .HasDatabaseName("ix_bookings_room_id_starts_at");
 

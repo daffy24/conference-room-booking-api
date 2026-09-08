@@ -11,6 +11,7 @@ namespace ConferenceBooking.Api.AspNetCore.Integration.Tests;
 public sealed class BusinessAppFactory : AppFactory, IAsyncLifetime
 {
     private const string ConnectionStringVariable = "CONFERENCE_BOOKING_TEST_CONNECTION_STRING";
+    private static readonly SemaphoreSlim MigrationLock = new(1, 1);
 
     public static bool IsConfigured => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ConnectionStringVariable));
 
@@ -39,9 +40,18 @@ public sealed class BusinessAppFactory : AppFactory, IAsyncLifetime
         if (!IsConfigured)
             return;
 
-        // The caller owns the disposable database. Never create, drop, or reset an application database here.
-        await using var scope = Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ConferenceBookingDbContext>();
-        await dbContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
+        // Class fixtures share a database. Serialize schema setup, while test requests remain concurrent.
+        await MigrationLock.WaitAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            // The caller owns the disposable database; fixtures never create, drop, or reset it.
+            await using var scope = Services.CreateAsyncScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ConferenceBookingDbContext>();
+            await dbContext.Database.MigrateAsync(TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            MigrationLock.Release();
+        }
     }
 }
