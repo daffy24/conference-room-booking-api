@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: src/Api/AspNetCore/Dockerfile
+      target: runtime
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
@@ -13,8 +14,8 @@ services:
     ports:
       - "127.0.0.1:5080:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       keycloak:
         condition: service_healthy
     healthcheck:
@@ -23,6 +24,20 @@ services:
       timeout: 25s
       retries: 3
       start_period: 15s
+
+  # A single deployment job upgrades the schema before any API instance starts.
+  migrations:
+    build:
+      context: .
+      dockerfile: src/Api/AspNetCore/Dockerfile
+      target: migrations
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__App: "Host=postgres;Port=5432;Database=conference_booking;Username=conference_booking;Password=${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env};Timeout=5"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.3
