@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "392e125b-2d7b-4d54-b310-5df26e85d965",
     "name": "Conference Booking · Authentication",
-    "description": "Локальна перевірка входу через Keycloak. Імпортуйте середовище Conference Booking · Local. У вкладці Authorization цієї колекції натисніть Get New Access Token, увійдіть через браузер і натисніть Use Token. Потім виконайте запити або запустіть колекцію. Користувачі: booking-customer (DEMO_CUSTOMER_PASSWORD у .env) і booking-admin (DEMO_ADMIN_PASSWORD). Пароль вводиться на сторінці Keycloak. Для зміни користувача отримайте новий токен. Деталі: postman/README.md.",
+    "description": "Local Keycloak authentication checks. Import Conference Booking · Local. In the collection Authorization tab, select Get New Access Token, sign in through the browser and select Use Token. Then send requests or run the collection. Application users: booking-customer (DEMO_CUSTOMER_PASSWORD in .env) and booking-admin (DEMO_ADMIN_PASSWORD). Enter passwords only on the Keycloak page. Obtain a new token to switch users. See postman/README.md; business endpoint schemas are available in Swagger.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -27,7 +27,7 @@
   "item": [
     {
       "name": "01 · Health",
-      "description": "Публічні перевірки доступності сервісів.",
+      "description": "Public service health checks.",
       "item": [
         {
           "name": "API is alive · 200",
@@ -35,7 +35,7 @@
             "method": "GET",
             "auth": { "type": "noauth" },
             "url": "{{base_url}}/health/live",
-            "description": "Перевіряє, що процес API відповідає. Не залежить від доступності бази."
+            "description": "Checks whether the API process responds, independently of database availability."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('API is alive', () => pm.response.to.have.status(200));",
@@ -48,7 +48,7 @@
             "method": "GET",
             "auth": { "type": "noauth" },
             "url": "{{base_url}}/health/ready",
-            "description": "Перевіряє підключення API до PostgreSQL. При недоступній БД очікується 503."
+            "description": "Checks the API connection to PostgreSQL. Returns 503 while the database is unavailable."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('Database is ready', () => pm.response.to.have.status(200));",
@@ -59,14 +59,14 @@
     },
     {
       "name": "02 · Identity",
-      "description": "Використовує токен із Authorization колекції. Вхід виконайте через Get New Access Token → Use Token.",
+      "description": "Uses the collection authorization token. Sign in with Get New Access Token, then select Use Token.",
       "item": [
         {
           "name": "Current user · 200",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/api/identity/me",
-            "description": "Повертає id, username та roles з перевіреного токена. Для booking-customer очікується Customer, для booking-admin — Admin. Успішний виклик перевіряє автентифікацію та claims; політики доступу до бізнес-методів перевірятимемо після їх появи."
+            "description": "Returns id, username and roles from the validated token. Expects Customer for booking-customer and Admin for booking-admin. This request verifies authentication and claims; business endpoint authorization is covered by the xUnit integration suite."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('Authenticated request succeeds', () => pm.response.to.have.status(200));",
@@ -88,7 +88,7 @@
     },
     {
       "name": "03 · Rejected requests",
-      "description": "Негативні перевірки. Запити явно перевизначають автентифікацію колекції.",
+      "description": "Negative checks. These requests explicitly override collection authorization.",
       "item": [
         {
           "name": "No token · 401",
@@ -96,7 +96,7 @@
             "method": "GET",
             "auth": { "type": "noauth" },
             "url": "{{base_url}}/api/identity/me",
-            "description": "Authorization header не надсилається, навіть коли в колекції вибраний токен."
+            "description": "Omits the Authorization header even when the collection has a selected token."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('Missing token is rejected', () => pm.response.to.have.status(401));",
@@ -109,7 +109,7 @@
             "method": "GET",
             "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "invalid-token", "type": "string" }] },
             "url": "{{base_url}}/api/identity/me",
-            "description": "Надсилає завідомо некоректний bearer token. Справжній токен колекції зберігається."
+            "description": "Sends a deliberately invalid bearer token. The real collection token is retained."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('Invalid token is rejected', () => pm.response.to.have.status(401));",
@@ -131,7 +131,7 @@
             "method": "GET",
             "auth": { "type": "noauth" },
             "url": "{{authority}}/.well-known/openid-configuration",
-            "description": "Публічні адреси Keycloak, issuer та підтримувані способи входу."
+            "description": "Public Keycloak endpoints, issuer and supported authentication capabilities."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('Discovery is available', () => pm.response.to.have.status(200));",
