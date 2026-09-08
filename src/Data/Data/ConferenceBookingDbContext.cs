@@ -1,4 +1,5 @@
 using ConferenceBooking.Data.Abstractions;
+using ConferenceBooking.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ConferenceBooking.Data;
@@ -13,6 +14,26 @@ public sealed class ConferenceBookingDbContext(
     IDbContextConfigurator configurator
 ) : DbContext(options)
 {
+    /// <summary>
+    /// The conference rooms, including rooms retained for booking history.
+    /// </summary>
+    public DbSet<RoomEntity> Rooms { get; set; } = null!;
+
+    /// <summary>
+    /// The services currently offered by rooms.
+    /// </summary>
+    public DbSet<RoomServiceEntity> RoomServices { get; set; } = null!;
+
+    /// <summary>
+    /// The confirmed room bookings.
+    /// </summary>
+    public DbSet<BookingEntity> Bookings { get; set; } = null!;
+
+    /// <summary>
+    /// The service snapshots belonging to bookings.
+    /// </summary>
+    public DbSet<BookingServiceEntity> BookingServices { get; set; } = null!;
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
