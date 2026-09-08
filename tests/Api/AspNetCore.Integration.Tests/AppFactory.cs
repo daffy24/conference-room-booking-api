@@ -12,7 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace ConferenceBooking.Api.AspNetCore.Integration.Tests;
 
-public sealed class AppFactory : WebApplicationFactory<Program>
+public class AppFactory : WebApplicationFactory<Program>
 {
     private const string Issuer = "http://localhost:8080/realms/conference-booking";
     private const string Audience = "conference-booking-api";
@@ -34,13 +34,13 @@ public sealed class AppFactory : WebApplicationFactory<Program>
         });
     }
 
-    public string CreateToken(string? role = "Customer", string? invalidPart = null)
+    public string CreateToken(string? role = "Customer", string? invalidPart = null, string subject = "user-123")
     {
         var now = DateTime.UtcNow;
         var claims = new List<Claim> { new("preferred_username", "test-customer") };
         if (invalidPart != "subject")
         {
-            claims.Add(new Claim("sub", "user-123"));
+            claims.Add(new Claim("sub", subject));
         }
 
         if (role is not null)
