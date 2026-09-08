@@ -1,0 +1,1032 @@
+{
+  "info": {
+    "_postman_id": "392e125b-2d7b-4d54-b310-5df26e85d965",
+    "name": "Conference Booking",
+    "description": "Authentication, room management, availability, bookings and administrator reports in one collection. Import the Local environment. In collection Authorization, choose Get New Access Token, sign in as booking-admin and select Use Token. Run folders in order for a complete scenario, or send requests manually. IDs are saved automatically. Blank dates default to tomorrow; edit collection variables to use another period. Each complete run creates a new demo room and future booking. Room deletion uses a separate unbooked room; the booked room remains because cancellation is not implemented. Passwords belong on the Keycloak login page only. See postman/README.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "tokenName",
+        "value": "Conference Booking · Local",
+        "type": "string"
+      },
+      {
+        "key": "grant_type",
+        "value": "authorization_code_with_pkce",
+        "type": "string"
+      },
+      {
+        "key": "challengeAlgorithm",
+        "value": "S256",
+        "type": "string"
+      },
+      {
+        "key": "useBrowser",
+        "value": true,
+        "type": "boolean"
+      },
+      {
+        "key": "authUrl",
+        "value": "{{authority}}/protocol/openid-connect/auth?prompt=login",
+        "type": "string"
+      },
+      {
+        "key": "accessTokenUrl",
+        "value": "{{authority}}/protocol/openid-connect/token",
+        "type": "string"
+      },
+      {
+        "key": "refreshTokenUrl",
+        "value": "{{authority}}/protocol/openid-connect/token",
+        "type": "string"
+      },
+      {
+        "key": "clientId",
+        "value": "{{client_id}}",
+        "type": "string"
+      },
+      {
+        "key": "redirect_uri",
+        "value": "{{callback_url}}",
+        "type": "string"
+      },
+      {
+        "key": "scope",
+        "value": "openid",
+        "type": "string"
+      },
+      {
+        "key": "state",
+        "value": "{{$guid}}",
+        "type": "string"
+      },
+      {
+        "key": "client_authentication",
+        "value": "body",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      },
+      {
+        "key": "headerPrefix",
+        "value": "Bearer",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "starts_at",
+      "value": "",
+      "type": "string",
+      "description": "Booking and availability start, ISO 8601 with Z or an explicit offset. Blank defaults to tomorrow at 08:00 UTC (10:00 or 11:00 in Kyiv). Clear to regenerate."
+    },
+    {
+      "key": "duration_minutes",
+      "value": "240",
+      "type": "string",
+      "description": "Booking and availability duration in minutes. Must fit within one Kyiv day, 06:00–23:00."
+    },
+    {
+      "key": "room_id",
+      "value": "",
+      "type": "string",
+      "description": "Saved by Create room. Used for reads, updates, availability checks, bookings and optional report filtering."
+    },
+    {
+      "key": "projector_id",
+      "value": "",
+      "type": "string",
+      "description": "Saved by Create room. Selected once per booking."
+    },
+    {
+      "key": "wifi_id",
+      "value": "",
+      "type": "string",
+      "description": "Saved by Create room. Retained when replacing the room service list."
+    },
+    {
+      "key": "booking_id",
+      "value": "",
+      "type": "string",
+      "description": "Saved by Create booking. Used by Get booking."
+    },
+    {
+      "key": "delete_room_id",
+      "value": "",
+      "type": "string",
+      "description": "Saved by Create unbooked room for deletion. Separate from the booked room."
+    },
+    {
+      "key": "report_from",
+      "value": "",
+      "type": "string",
+      "description": "First Kyiv date, YYYY-MM-DD. Blank defaults to the booking start date."
+    },
+    {
+      "key": "report_to",
+      "value": "",
+      "type": "string",
+      "description": "Last Kyiv date, YYYY-MM-DD. Blank defaults to the booking start date."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// UTC keeps query timestamps unambiguous; 08:00 UTC is within Kyiv opening hours year-round.",
+          "if (!pm.variables.get('starts_at')) {",
+          "  const tomorrow = new Date();",
+          "  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);",
+          "  tomorrow.setUTCHours(8, 0, 0, 0);",
+          "  pm.collectionVariables.set('starts_at', tomorrow.toISOString());",
+          "}",
+          "if (!pm.variables.get('duration_minutes')) {",
+          "  pm.collectionVariables.set('duration_minutes', '240');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 · Health",
+      "description": "Public service health checks.",
+      "item": [
+        {
+          "name": "API is alive · 200",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{base_url}}/health/live",
+            "description": "Checks whether the API process responds, independently of database availability."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('API is alive', () => pm.response.to.have.status(200));",
+                  "pm.test('Health response is Healthy', () => pm.expect(pm.response.text()).to.eql('Healthy'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Database is ready · 200",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{base_url}}/health/ready",
+            "description": "Checks the API connection to PostgreSQL. Returns 503 while the database is unavailable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Database is ready', () => pm.response.to.have.status(200));",
+                  "pm.test('Health response is Healthy', () => pm.expect(pm.response.text()).to.eql('Healthy'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 · Authentication",
+      "description": "Public discovery, authenticated identity and deliberate 401 responses. Login is configured in the collection Authorization tab using browser-based Authorization Code with PKCE.",
+      "item": [
+        {
+          "name": "OpenID Connect discovery · 200",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{authority}}/.well-known/openid-configuration",
+            "description": "Public Keycloak endpoints, issuer and supported authentication capabilities."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Discovery is available', () => pm.response.to.have.status(200));",
+                  "pm.test('Issuer matches the environment', () => pm.expect(pm.response.json().issuer).to.eql(pm.environment.get('authority')));",
+                  "pm.test('PKCE with S256 is supported', () => pm.expect(pm.response.json().code_challenge_methods_supported).to.include('S256'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current user · 200",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/identity/me",
+            "description": "Returns id, username and roles from the validated collection token. Use this after login or when switching users. Demo application users are booking-admin (Admin) and booking-customer (Customer)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Authenticated request succeeds', () => pm.response.to.have.status(200));",
+                  "pm.test('Identity contains a subject and username', () => {",
+                  "  const user = pm.response.json();",
+                  "  pm.expect(user.id).to.be.a('string').and.not.empty;",
+                  "  pm.expect(user.username).to.be.a('string').and.not.empty;",
+                  "  pm.expect(user.roles).to.be.an('array');",
+                  "});",
+                  "pm.test('Demo user has the assigned application role', () => {",
+                  "  const user = pm.response.json();",
+                  "  const expectedRoles = { 'booking-customer': 'Customer', 'booking-admin': 'Admin' };",
+                  "  pm.expect(user.username).to.be.oneOf(Object.keys(expectedRoles));",
+                  "  pm.expect(user.roles).to.include(expectedRoles[user.username]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No token · 401",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{base_url}}/api/identity/me",
+            "description": "Omits the Authorization header even when the collection has a selected token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing token is rejected', () => pm.response.to.have.status(401));",
+                  "pm.test('Authentication challenge is present', () => pm.expect(pm.response.headers.get('WWW-Authenticate')).to.match(/^Bearer/i));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid token · 401",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "invalid-token",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/api/identity/me",
+            "description": "Sends a deliberately invalid bearer token. The real collection token is retained."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid token is rejected', () => pm.response.to.have.status(401));",
+                  "pm.test('Authentication challenge is present', () => pm.expect(pm.response.headers.get('WWW-Authenticate')).to.match(/^Bearer/i));",
+                  "pm.test('Validation details are not exposed', () => {",
+                  "  pm.expect(pm.response.text()).not.to.include('IDX');",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate')).not.to.include('error_description');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 · Rooms",
+      "description": "Run Create room first as booking-admin. The response saves room and service IDs for the next requests. PATCH demonstrates changing the hourly rate and adding Sound while retaining existing services.",
+      "item": [
+        {
+          "name": "Create room · 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/rooms",
+            "description": "Admin. Creates a uniquely named demo room and saves room_id, projector_id and wifi_id. Clears the previous scenario IDs before sending. Seed rooms are unaffected.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman room {{$guid}}\",\n  \"capacity\": 50,\n  \"baseHourlyRate\": 2000,\n  \"services\": [\n    {\n      \"name\": \"Projector\",\n      \"price\": 500\n    },\n    {\n      \"name\": \"Wi-Fi\",\n      \"price\": 300\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of ['room_id', 'projector_id', 'wifi_id', 'booking_id']) {",
+                  "  pm.collectionVariables.set(name, '');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  const room = pm.response.json();",
+                  "  pm.collectionVariables.set('room_id', room.id);",
+                  "  pm.collectionVariables.set('projector_id', room.services.find(service => service.name === 'Projector')?.id || '');",
+                  "  pm.collectionVariables.set('wifi_id', room.services.find(service => service.name === 'Wi-Fi')?.id || '');",
+                  "  pm.test('Room and service IDs are available for subsequent requests', () => {",
+                  "    for (const name of ['room_id', 'projector_id', 'wifi_id']) {",
+                  "      pm.expect(pm.collectionVariables.get(name), name).to.be.a('string').and.not.empty;",
+                  "    }",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get room · 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/rooms/{{room_id}}",
+            "description": "Any authenticated user. Reads the room saved by Create room."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('room_id')) {",
+                  "  throw new Error('Send Rooms > Create room first, or set room_id in collection variables.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Requested room is returned', () => pm.expect(pm.response.json().id).to.eql(pm.variables.get('room_id')));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update rate and services · 200",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/rooms/{{room_id}}",
+            "description": "Admin. Raises the base hourly rate to 2500 UAH and adds Sound. Omitted fields remain unchanged. A supplied services array replaces the entire list; keep existing service IDs to retain them. Previously booked prices are preserved.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"baseHourlyRate\": 2500,\n  \"services\": [\n    { \"id\": \"{{projector_id}}\", \"name\": \"Projector\", \"price\": 500 },\n    { \"id\": \"{{wifi_id}}\", \"name\": \"Wi-Fi\", \"price\": 300 },\n    { \"name\": \"Sound\", \"price\": 700 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('room_id')) {",
+                  "  throw new Error('Send Rooms > Create room first, or set room_id in collection variables.');",
+                  "}",
+                  "if (!pm.variables.get('projector_id')) {",
+                  "  throw new Error('Send Rooms > Create room first, or set projector_id to a service belonging to room_id.');",
+                  "}",
+                  "if (!pm.variables.get('wifi_id')) {",
+                  "  throw new Error('Send Rooms > Create room first to save wifi_id.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const room = pm.response.json();",
+                  "  pm.collectionVariables.set('room_id', room.id);",
+                  "  pm.collectionVariables.set('projector_id', room.services.find(service => service.name === 'Projector')?.id || '');",
+                  "  pm.collectionVariables.set('wifi_id', room.services.find(service => service.name === 'Wi-Fi')?.id || '');",
+                  "  pm.test('Hourly rate and service list were updated', () => {",
+                  "    pm.expect(room.baseHourlyRate).to.eql(2500);",
+                  "    pm.expect(room.services.map(service => service.name)).to.have.members(['Projector', 'Wi-Fi', 'Sound']);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Find available rooms · 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/rooms/available?startsAt={{availability_starts_at}}&endsAt={{availability_ends_at}}&capacity=50&page=1&pageSize=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "available"
+              ],
+              "query": [
+                {
+                  "key": "startsAt",
+                  "value": "{{availability_starts_at}}"
+                },
+                {
+                  "key": "endsAt",
+                  "value": "{{availability_ends_at}}"
+                },
+                {
+                  "key": "capacity",
+                  "value": "50"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Any authenticated user. Finds rooms with at least 50 seats during the selected interval. The end is calculated from starts_at and duration_minutes. Send again after creating the booking: the booked room will no longer be available. Results are paginated."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const start = new Date(pm.variables.get('starts_at'));",
+                  "const duration = Number(pm.variables.get('duration_minutes'));",
+                  "if (!Number.isFinite(start.getTime()) || !Number.isInteger(duration) || duration <= 0) {",
+                  "  throw new Error('Set starts_at to an ISO 8601 timestamp and duration_minutes to a positive integer.');",
+                  "}",
+                  "// Normalize offsets to Z so a query-string '+' cannot be interpreted as a space.",
+                  "pm.variables.set('availability_starts_at', start.toISOString());",
+                  "pm.variables.set('availability_ends_at', new Date(start.getTime() + duration * 60000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const result = pm.response.json();",
+                  "  pm.test('Available rooms are paginated and satisfy the requested capacity', () => {",
+                  "    pm.expect(result.items).to.be.an('array');",
+                  "    pm.expect(result.totalCount).to.be.at.least(0);",
+                  "    result.items.forEach(room => pm.expect(room.capacity).to.be.at.least(Number(pm.request.url.query.get('capacity'))));",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 · Bookings",
+      "description": "Customer or Admin may book. Run Rooms > Create room first. Prices use Kyiv tariff bands, proportional minutes and one charge per selected service. The booking owner comes from the access token.",
+      "item": [
+        {
+          "name": "Create booking · 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings",
+            "description": "Creates a booking for room_id using starts_at, duration_minutes and Projector. Saves booking_id. Dates must be in the future, minute-aligned, and inside one Kyiv day from 06:00 to 23:00. Repeating the same booking returns 409; create another demo room or choose a different interval to start a new scenario.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": \"{{room_id}}\",\n  \"startsAt\": \"{{starts_at}}\",\n  \"durationMinutes\": {{duration_minutes}},\n  \"serviceIds\": [\"{{projector_id}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('room_id')) {",
+                  "  throw new Error('Send Rooms > Create room first, or set room_id in collection variables.');",
+                  "}",
+                  "if (!pm.variables.get('projector_id')) {",
+                  "  throw new Error('Send Rooms > Create room first, or set projector_id to a service belonging to room_id.');",
+                  "}",
+                  "pm.collectionVariables.set('booking_id', '');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  const booking = pm.response.json();",
+                  "  pm.collectionVariables.set('booking_id', booking.id);",
+                  "  pm.test('Booking identifies the selected room and interval', () => {",
+                  "    pm.expect(booking.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(booking.roomId).to.eql(pm.variables.get('room_id'));",
+                  "    pm.expect(new Date(booking.startsAt).getTime()).to.eql(new Date(pm.variables.get('starts_at')).getTime());",
+                  "    pm.expect((new Date(booking.endsAt) - new Date(booking.startsAt)) / 60000).to.eql(Number(pm.variables.get('duration_minutes')));",
+                  "  });",
+                  "  pm.test('UAH total includes rental and one charge per selected service', () => {",
+                  "    pm.expect(booking.currency).to.eql('UAH');",
+                  "    pm.expect(booking.rentalCost).to.be.above(0);",
+                  "    pm.expect(booking.services).to.have.lengthOf(1);",
+                  "    pm.expect(booking.services[0].serviceId).to.eql(pm.variables.get('projector_id'));",
+                  "    pm.expect(booking.servicesCost).to.eql(booking.services[0].price);",
+                  "    pm.expect(booking.totalCost).to.be.closeTo(booking.rentalCost + booking.servicesCost, 0.001);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get booking · 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/bookings/{{booking_id}}",
+            "description": "Returns the stored price snapshot. Only the booking owner or an administrator can read it; another customer receives 404."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('booking_id')) {",
+                  "  throw new Error('Send Bookings > Create booking first, or set booking_id.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Requested booking is returned', () => pm.expect(pm.response.json().id).to.eql(pm.variables.get('booking_id')));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject overlapping booking · 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings",
+            "description": "Sends the same room, start and duration again. Run Create booking successfully first. The expected conflict prevents a second reservation and leaves booking_id unchanged.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": \"{{room_id}}\",\n  \"startsAt\": \"{{starts_at}}\",\n  \"durationMinutes\": {{duration_minutes}},\n  \"serviceIds\": [\"{{projector_id}}\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('room_id')) {",
+                  "  throw new Error('Send Rooms > Create room first, or set room_id in collection variables.');",
+                  "}",
+                  "if (!pm.variables.get('projector_id')) {",
+                  "  throw new Error('Send Rooms > Create room first, or set projector_id to a service belonging to room_id.');",
+                  "}",
+                  "if (!pm.variables.get('booking_id')) {",
+                  "  throw new Error('Create a booking successfully before checking the overlapping interval.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 · Reports",
+      "description": "Admin only. from/to are inclusive Kyiv dates (maximum 366 days). Blank report variables default to the booking start date, so the scenario booking appears immediately. Reports measure booked amounts, including future reservations; they do not measure received payments. Enable roomId in Params to filter the saved room.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Opening hours keep the Kyiv booking date on the same UTC calendar date.",
+              "const start = new Date(pm.variables.get('starts_at'));",
+              "for (const name of ['report_from', 'report_to']) {",
+              "  if (!pm.variables.get(name)) {",
+              "    if (!Number.isFinite(start.getTime())) {",
+              "      throw new Error('Set report_from and report_to to dates in YYYY-MM-DD format.');",
+              "    }",
+              "    pm.collectionVariables.set(name, start.toISOString().slice(0, 10));",
+              "  }",
+              "  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(pm.variables.get(name))) {",
+              "    throw new Error(`Set ${name} to a date in YYYY-MM-DD format.`);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Booked revenue by day",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/revenue?from={{report_from}}&to={{report_to}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "revenue"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{report_from}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{report_to}}"
+                },
+                {
+                  "key": "roomId",
+                  "value": "{{room_id}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns confirmed booking values, including future bookings, not received payments."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Administrator receives a report', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const report = pm.response.json();",
+                  "  pm.test('Daily series uses UAH and Kyiv dates', () => { pm.expect(report.currency).to.eql('UAH'); pm.expect(report.timeZone).to.eql('Europe/Kyiv'); pm.expect(report.days).to.be.an('array'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Room performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/rooms?from={{report_from}}&to={{report_to}}&page=1&pageSize=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "rooms"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{report_from}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{report_to}}"
+                },
+                {
+                  "key": "roomId",
+                  "value": "{{room_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Ranks rooms by booked revenue; includes active rooms with zero bookings."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Administrator receives a report', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const report = pm.response.json();",
+                  "  pm.test('Result is paginated', () => { pm.expect(report.items).to.be.an('array'); pm.expect(report.totalCount).to.be.at.least(0); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Service popularity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/services?from={{report_from}}&to={{report_to}}&page=1&pageSize=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "services"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{report_from}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{report_to}}"
+                },
+                {
+                  "key": "roomId",
+                  "value": "{{room_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Ranks service snapshots by booking count, then booked value; retains removed services."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Administrator receives a report', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "  const report = pm.response.json();",
+                  "  pm.test('Result is paginated', () => { pm.expect(report.items).to.be.an('array'); pm.expect(report.totalCount).to.be.at.least(0); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 · Room deletion",
+      "description": "Admin only. Creates a separate unbooked room to demonstrate deletion. The room used for the booking remains: deleting a room with a future or ongoing booking returns 409, and cancellation is outside the current API.",
+      "item": [
+        {
+          "name": "Create unbooked room for deletion · 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/rooms",
+            "description": "Creates a disposable room and saves delete_room_id. Does not overwrite room_id or affect the booking/report scenario.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman deletion {{$guid}}\",\n  \"capacity\": 10,\n  \"baseHourlyRate\": 1000,\n  \"services\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('delete_room_id', '');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('delete_room_id', pm.response.json().id);",
+                  "  pm.test('Separate room ID is saved', () => {",
+                  "    pm.expect(pm.collectionVariables.get('delete_room_id')).to.be.a('string').and.not.empty;",
+                  "    pm.expect(pm.collectionVariables.get('delete_room_id')).not.to.eql(pm.variables.get('room_id'));",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete unbooked room · 204",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/api/rooms/{{delete_room_id}}",
+            "description": "Admin. Soft-deletes only the room saved by the preceding request. Repeating deletion returns 404."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('delete_room_id')) {",
+                  "  throw new Error('Send Create unbooked room for deletion first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleted room is unavailable · 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/rooms/{{delete_room_id}}",
+            "description": "Confirms that the deleted room is no longer exposed by the API."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('delete_room_id')) {",
+                  "  throw new Error('Create and delete the separate unbooked room first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

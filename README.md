@@ -53,7 +53,7 @@ Open Swagger using **localhost**, select **Authorize**, keep the `openid` scope,
 
 The Keycloak bootstrap administrator is separate from the application administrator. The other three `.env` variables configure PostgreSQL administration (`POSTGRES_PASSWORD`), the application database role (`APP_DB_PASSWORD`) and the Keycloak database role (`KEYCLOAK_DB_PASSWORD`).
 
-Access tokens expire after five minutes. Obtain a new token if an authenticated request returns `401`. For Postman, use the [authentication and report collections](postman/README.md) with the shared local environment.
+Access tokens expire after five minutes. Obtain a new token if an authenticated request returns `401`. For Postman, import the [combined collection](postman/ConferenceBooking.postman_collection.json) and [local environment](postman/ConferenceBooking.Local.postman_environment.json). It covers authentication, room CRUD, availability, bookings and reports, with IDs passed between requests automatically. Follow the [Postman setup and workflow](postman/README.md) and sign in as `booking-admin` to run every folder.
 
 ## Endpoints
 
